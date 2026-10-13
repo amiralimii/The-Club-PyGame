@@ -1,321 +1,504 @@
-import pygame
+import os
 import random
-import sys
-
+import pygame
 pygame.init()
 
-WIDTH, HEIGHT = 900, 700
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Tile Club - Match Puzzle Games")
+WIDTH = 900
+HEIGHT = 700
+FPS = 60
 
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Tile Club - Match Puzzle")
 clock = pygame.time.Clock()
 
-BACKGROUND = (24, 32, 44)
-PANEL = (37, 48, 62)
-TILE_COLOR = (245, 226, 190)
-TILE_SHADOW = (153, 119, 83)
+BACKGROUND_COLOR = (35, 24, 58)
+PURPLE = (100, 60, 160)
+DARK_PURPLE = (43, 27, 70)
+LIGHT_PURPLE = (190, 150, 255)
+GOLD = (255, 205, 90)
 WHITE = (255, 255, 255)
-GOLD = (255, 194, 65)
-GREEN = (93, 190, 125)
-RED = (235, 85, 85)
+GREEN = (90, 220, 140)
+RED = (255, 100, 120)
+GRAY = (170, 170, 180)
 
-font = pygame.font.SysFont("segoeui", 25, bold=True)
-small_font = pygame.font.SysFont("segoeui", 18)
-title_font = pygame.font.SysFont("segoeui", 38, bold=True)
+font = pygame.font.Font(None, 32)
+small_font = pygame.font.Font(None, 24)
+title_font = pygame.font.Font(None, 76)
+button_font = pygame.font.Font(None, 38)
 
-TILE_SIZE = 72
-GAP = 9
-TRAY_LIMIT = 7
-MATCH_COUNT = 3
-SYMBOLS = ["★", "◆", "●", "♣", "♥", "✿", "▲"]
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+IMAGES_DIR = os.path.join(ASSETS_DIR, "images")
+TILES_DIR = os.path.join(ASSETS_DIR, "tiles")
+MUSIC_DIR = os.path.join(ASSETS_DIR, "music")
 
-tile_font = pygame.font.SysFont("segoeuisymbol", 34, bold=True)
+def load_image(path):
+    if not os.path.isfile(path):
+        print(f"Image not found: {path}")
+        return None
+    try:
+        return pygame.image.load(path).convert_alpha()
+    except pygame.error as error:
+        print(f"Could not load image: {path}")
+        print(error)
+        return None
+background = load_image(
+    os.path.join(IMAGES_DIR, "background.png")
+)
+card_back = load_image(
+    os.path.join(TILES_DIR, "card_back.png")
+)
+TILE_FILES = [
+    "tile_strawberry.png",
+    "tile_grapes.png",
+    "tile_orange.png",
+    "tile_apple.png",
+    "tile_banana.png",
+    "tile_watermelon.png",
+    "tile_lemon.png",
+    "tile_pink_flower.png",
+    "tile_white_flower.png",
+    "tile_purple_flower.png",
+    "tile_blue_flower.png",
+    "tile_leaf.png",
+    "tile_mushroom.png",
+    "tile_butterfly.png",
+    "tile_ladybug.png",
+    "tile_paw.png",
+    "tile_star.png",
+    "tile_heart.png",
+    "tile_clover.png",
+    "tile_pinecone.png",
+    "tile_snowflake.png",
+]
 
-board = []
-tray = []
-score = 0
-level = 1
-message = "Match 3 identical tiles!"
-game_over = False
-selected_hint = None
+tile_images = {}
 
-def create_board():
-    """Create a board containing groups of matching tiles."""
-    tiles = []
-    for symbol in SYMBOLS:
-        tiles.extend([symbol] * 6)
+for tile_id, filename in enumerate(TILE_FILES):
+    image_path = os.path.join(TILES_DIR, filename)
+    image = load_image(image_path)
 
-    random.shuffle(tiles)
+    if image is not None:
+        tile_images[tile_id] = image
 
-    result = []
-
-    for row in range(6):
-        for col in range(7):
-            index = row * 7 + col
-
-            result.append({
-                "symbol": tiles[index],
-                "x": 0,
-                "y": 0,
-                "active": True
-            })
-
-    return result
-
-
-def restart_game():
-    global board, tray, score, level
-    global message, game_over, selected_hint
-
-    board = create_board()
-    tray = []
-    score = 0
-    level = 1
-    message = "Match 3 identical tiles!"
-    game_over = False
-    selected_hint = None
-
-def draw_text(text, font_obj, color, x, y, center=False):
-    image = font_obj.render(str(text), True, color)
-    rect = image.get_rect()
-
-    if center:
-        rect.center = (x, y)
+MUSIC_PATH = os.path.join(MUSIC_DIR, "background.mp3")
+AUDIO_AVAILABLE = False
+music_enabled = False
+music_volume = 0.25
+try:
+    if pygame.mixer.get_init() is None:
+        pygame.mixer.init()
+    AUDIO_AVAILABLE = True
+except pygame.error as error:
+    print("Audio is unavailable:", error)
+def toggle_music():
+    global music_enabled
+    if not AUDIO_AVAILABLE:
+        print("Audio is unavailable on this system.")
+        return
+    if music_enabled:
+        pygame.mixer.music.stop()
+        music_enabled = False
+        return
+    if not os.path.isfile(MUSIC_PATH):
+        print("Music file not found:", MUSIC_PATH)
+        return
+    try:
+        pygame.mixer.music.load(MUSIC_PATH)
+        pygame.mixer.music.set_volume(music_volume)
+        pygame.mixer.music.play(-1)
+        music_enabled = True
+    except pygame.error as error:
+        music_enabled = False
+        print("Music error:", error)
+def change_volume(value):
+    global music_volume
+    music_volume = max(0.0, min(1.0, value))
+    if AUDIO_AVAILABLE:
+        pygame.mixer.music.set_volume(music_volume)
+def draw_background():
+    if background is not None:
+        image = pygame.transform.smoothscale(
+            background, (WIDTH, HEIGHT)
+        )
+        screen.blit(image, (0, 0))
     else:
-        rect.topleft = (x, y)
-
-    screen.blit(image, rect)
-
-def draw_button(text, x, y, width, height, color):
-    rect = pygame.Rect(x, y, width, height)
-
+        screen.fill(BACKGROUND_COLOR)
+def draw_center_text(text, y, text_font, color=WHITE):
+    surface = text_font.render(text, True, color)
+    rect = surface.get_rect(center=(WIDTH // 2, y))
+    screen.blit(surface, rect)
+def draw_button(rect, text, selected=False):
+    color = GOLD if selected else PURPLE
+    text_color = DARK_PURPLE if selected else WHITE
     pygame.draw.rect(
-        screen, color, rect,
-        border_radius=12
-    )
-
-    pygame.draw.rect(
-        screen, (255, 255, 255), rect,
-        width=2, border_radius=12
-    )
-
-    draw_text(
-        text, small_font, WHITE,
-        rect.centerx, rect.centery, True
-    )
-
-    return rect
-
-def draw_tile(symbol, x, y, highlighted=False):
-    
-    pygame.draw.rect(
-        screen, TILE_SHADOW,
-        (x + 3, y + 5, TILE_SIZE, TILE_SIZE),
-        border_radius=12
-    )
-
-    pygame.draw.rect(
-        screen, TILE_COLOR,
-        (x, y, TILE_SIZE, TILE_SIZE),
-        border_radius=12
-    )
-
-    border_color = GOLD if highlighted else (255, 248, 224)
-
-    pygame.draw.rect(
-        screen, border_color,
-        (x, y, TILE_SIZE, TILE_SIZE),
-        width=3 if highlighted else 2,
-        border_radius=12
-    )
-
-    symbol_surface = tile_font.render(symbol, True, (60, 67, 78))
-    symbol_rect = symbol_surface.get_rect(
-        center=(x + TILE_SIZE // 2, y + TILE_SIZE // 2)
-    )
-
-    screen.blit(symbol_surface, symbol_rect)
-
-def check_matches():
-    global tray, score, message, level
-
-    matched = []
-
-    for symbol in set(tray):
-        count = tray.count(symbol)
-
-        if count >= MATCH_COUNT:
-            matched.append(symbol)
-
-    for symbol in matched:
-        removed = 0
-        new_tray = []
-
-        for item in tray:
-            if item == symbol and removed < MATCH_COUNT:
-                removed += 1
-            else:
-                new_tray.append(item)
-
-        tray = new_tray
-        score += 100
-        message = "Great match! +100 points"
-
-    if score >= level * 500:
-        level += 1
-        message = f"Level {level} unlocked!"
-
-def select_tile(tile):
-    global tray, message, game_over, selected_hint
-
-    if game_over or not tile["active"]:
-        return
-
-    if len(tray) >= TRAY_LIMIT:
-        game_over = True
-        message = "No space left! Restart to play again."
-        return
-
-    tile["active"] = False
-    tray.append(tile["symbol"])
-    selected_hint = None
-
-    check_matches()
-
-    if len(tray) >= TRAY_LIMIT:
-        game_over = True
-        message = "Game over! Press Restart."
-
-def draw_game():
-    screen.fill(BACKGROUND)
-    draw_text(
-        "TILE CLUB",
-        title_font, GOLD,
-        WIDTH // 2, 35, True
-    )
-    draw_text(
-        "MATCH PUZZLE GAMES",
-        small_font, WHITE,
-        WIDTH // 2, 72, True
+        screen, color, rect, border_radius=15
     )
     pygame.draw.rect(
-        screen, PANEL,
-        (25, 100, 850, 48),
-        border_radius=12
+        screen, LIGHT_PURPLE, rect,
+        width=3, border_radius=15
     )
-    draw_text(f"Score: {score}", font, WHITE, 45, 108)
-    draw_text(f"Level: {level}", font, GOLD, 390, 108)
-    draw_text(
-        f"Tray: {len(tray)}/{TRAY_LIMIT}",
-        font, WHITE, 670, 108
-    )
+    label = button_font.render(text, True, text_color)
+    screen.blit(label, label.get_rect(center=rect.center))
+current_page = "menu"
+play_rect = pygame.Rect(325, 280, 250, 65)
+settings_rect = pygame.Rect(325, 365, 250, 65)
+exit_rect = pygame.Rect(325, 450, 250, 65)
+music_button_rect = pygame.Rect(300, 300, 300, 60)
+back_settings_rect = pygame.Rect(325, 480, 250, 60)
+back_game_rect = pygame.Rect(25, 20, 120, 45)
+restart_rect = pygame.Rect(755, 20, 120, 45)
+slider_rect = pygame.Rect(300, 410, 300, 10)
+slider_dragging = False
+COLS = 7
+ROWS = 6
+CARD_SIZE = 76
+GAP = 8
+GRID_WIDTH = COLS * CARD_SIZE + (COLS - 1) * GAP
+GRID_HEIGHT = ROWS * CARD_SIZE + (ROWS - 1) * GAP
+GRID_X = (WIDTH - GRID_WIDTH) // 2
+GRID_Y = 145
+cards = []
+first_card = None
+second_card = None
+matched_pairs = 0
+moves = 0
+game_over = False
+win_message = ""
+hide_timer = 0
+def create_deck():
+    global cards
+    available_ids = list(tile_images.keys())
+    available_ids = available_ids[:21]
+    if not available_ids:
+        available_ids = list(range(21))
+    deck = available_ids * 2
+    random.shuffle(deck)
+    cards = []
+    for tile_id in deck:
+        cards.append({
+            "id": tile_id,
+            "revealed": False,
+            "matched": False,
+            "rect": pygame.Rect(0, 0, CARD_SIZE, CARD_SIZE),
+        })
+    position_cards()
+def position_cards():
+    for index, card in enumerate(cards):
+        row = index // COLS
+        col = index % COLS
+        x = GRID_X + col * (CARD_SIZE + GAP)
+        y = GRID_Y + row * (CARD_SIZE + GAP)
+        card["rect"] = pygame.Rect(
+            x, y, CARD_SIZE, CARD_SIZE
+        )
+def restart_game():
+    global first_card
+    global second_card
+    global matched_pairs
+    global moves
+    global game_over
+    global win_message
+    global hide_timer
+    first_card = None
+    second_card = None
+    matched_pairs = 0
+    moves = 0
+    game_over = False
+    win_message = ""
+    hide_timer = 0
+    create_deck()
+def draw_card(card):
+    rect = card["rect"]
+    shadow_rect = rect.move(3, 4)
     pygame.draw.rect(
-        screen, PANEL,
-        (115, 165, 670, 385),
-        border_radius=18
+        screen,
+        DARK_PURPLE,
+        shadow_rect,
+        border_radius=12,
     )
-    start_x = 175
-    start_y = 185
-    for index, tile in enumerate(board):
-        row = index // 7
-        col = index % 7
-        x = start_x + col * (TILE_SIZE + GAP)
-        y = start_y + row * (TILE_SIZE + GAP)
-        tile["x"] = x
-        tile["y"] = y
-        if tile["active"]:
-            draw_tile(
-                tile["symbol"], x, y,
-                highlighted=(selected_hint == index)
-            )
-    draw_text(
-        "YOUR TILE TRAY",
-        small_font, WHITE,
-        WIDTH // 2, 574, True
-    )
-    tray_width = 7 * 66 + 6 * 5
-    tray_x = (WIDTH - tray_width) // 2
-    for index in range(TRAY_LIMIT):
-        x = tray_x + index * 71
-        y = 592
+    if card["revealed"] or card["matched"]:
         pygame.draw.rect(
-            screen, (17, 23, 33),
-            (x, y, 66, 66),
-            border_radius=10
+            screen,
+            WHITE,
+            rect,
+            border_radius=12,
         )
-        if index < len(tray):
-            draw_tile(tray[index], x, y)
-    restart_rect = draw_button(
-        "RESTART", 235, 665, 125, 30, GREEN
+        image = tile_images.get(card["id"])
+        if image is not None:
+            picture = pygame.transform.smoothscale(
+                image,
+                (CARD_SIZE - 10, CARD_SIZE - 10),
+            )
+            screen.blit(
+                picture,
+                (rect.x + 5, rect.y + 5),
+            )
+        else:
+            label = font.render(
+                str(card["id"] + 1), True, DARK_PURPLE
+            )
+            screen.blit(
+                label,
+                label.get_rect(center=rect.center),
+            )
+        border_color = GREEN if card["matched"] else GOLD
+    else:
+        if card_back is not None:
+            picture = pygame.transform.smoothscale(
+                card_back,
+                (CARD_SIZE, CARD_SIZE),
+            )
+            screen.blit(picture, rect.topleft)
+        else:
+            pygame.draw.rect(
+                screen,
+                PURPLE,
+                rect,
+                border_radius=12,
+            )
+            pygame.draw.circle(
+                screen,
+                GOLD,
+                rect.center,
+                13,
+                width=3,
+            )
+        border_color = LIGHT_PURPLE
+    pygame.draw.rect(
+        screen,
+        border_color,
+        rect,
+        width=3,
+        border_radius=12,
     )
-    hint_rect = draw_button(
-        "HINT", 387, 665, 100, 30, (74, 128, 210)
+def draw_menu():
+    draw_background()
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((20, 10, 35, 110))
+    screen.blit(overlay, (0, 0))
+    draw_center_text(
+        "TILE CLUB",
+        155,
+        title_font,
+        GOLD,
     )
-    shuffle_rect = draw_button(
-        "SHUFFLE", 515, 665, 125, 30, (145, 96, 190)
+    draw_center_text(
+        "MATCH PUZZLE",
+        215,
+        font,
+        WHITE,
     )
-    draw_text(
-        message, small_font,
-        RED if game_over else WHITE,
-        WIDTH // 2, 555, True
+    draw_button(play_rect, "PLAY")
+    draw_button(settings_rect, "SETTINGS")
+    draw_button(exit_rect, "EXIT")
+    draw_center_text(
+        "Find all matching pairs!",
+        570,
+        small_font,
+        WHITE,
     )
+def draw_settings():
+    draw_background()
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((20, 10, 35, 130))
+    screen.blit(overlay, (0, 0))
+    draw_center_text(
+        "SETTINGS",
+        175,
+        title_font,
+        GOLD,
+    )
+    music_text = (
+        "MUSIC: ON" if music_enabled else "MUSIC: OFF"
+    )
+    draw_button(music_button_rect, music_text)
+    draw_center_text(
+        "Music Volume",
+        385,
+        font,
+        WHITE,
+    )
+    pygame.draw.rect(
+        screen,
+        GRAY,
+        slider_rect,
+        border_radius=6,
+    )
+    filled_width = int(slider_rect.width * music_volume)
+    filled_rect = pygame.Rect(
+        slider_rect.x,
+        slider_rect.y,
+        filled_width,
+        slider_rect.height,
+    )
+    pygame.draw.rect(
+        screen,
+        GOLD,
+        filled_rect,
+        border_radius=6,
+    )
+    knob_x = slider_rect.x + int(
+        slider_rect.width * music_volume
+    )
+    pygame.draw.circle(
+        screen,
+        WHITE,
+        (knob_x, slider_rect.centery),
+        13,
+    )
+    volume_percent = int(music_volume * 100)
+    draw_center_text(
+        f"{volume_percent}%",
+        445,
+        small_font,
+        WHITE,
+    )
+    draw_button(back_settings_rect, "BACK")
+def update_volume_from_mouse(mouse_x):
+    value = (
+        mouse_x - slider_rect.x
+    ) / slider_rect.width
+    change_volume(value)
+def draw_game():
+    draw_background()
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((20, 10, 35, 115))
+    screen.blit(overlay, (0, 0))
+    draw_button(back_game_rect, "MENU")
+    draw_button(restart_rect, "RESTART")
+    draw_center_text(
+        "MATCH THE PAIRS",
+        78,
+        font,
+        GOLD,
+    )
+    status = f"Moves: {moves}     Matched pairs: {matched_pairs}/21"
+    draw_center_text(
+        status,
+        112,
+        small_font,
+        WHITE,
+    )
+    for card in cards:
+        draw_card(card)
     if game_over:
-        draw_text(
-            "GAME OVER",
-            title_font, RED,
-            WIDTH // 2, 315, True
+        panel = pygame.Rect(220, 285, 460, 130)
+        pygame.draw.rect(
+            screen,
+            DARK_PURPLE,
+            panel,
+            border_radius=20,
         )
-    return restart_rect, hint_rect, shuffle_rect
+        pygame.draw.rect(
+            screen,
+            GOLD,
+            panel,
+            width=3,
+            border_radius=20,
+        )
+        draw_center_text(
+            win_message,
+            330,
+            title_font,
+            GOLD,
+        )
+        draw_center_text(
+            f"Total moves: {moves}",
+            375,
+            font,
+            WHITE,
+        )
+def handle_card_click(mouse_pos):
+    global first_card
+    global second_card
+    global moves
+    global hide_timer
+    global game_over
+    global win_message
+    if game_over:
+        return
+    if first_card is not None and second_card is not None:
+        return
+    for card in cards:
+        if not card["rect"].collidepoint(mouse_pos):
+            continue
+        if card["revealed"] or card["matched"]:
+            return
+        card["revealed"] = True
+        if first_card is None:
+            first_card = card
+        else:
+            second_card = card
+            moves += 1
+            if first_card["id"] == second_card["id"]:
+                first_card["matched"] = True
+                second_card["matched"] = True
+                first_card = None
+                second_card = None
+                global matched_pairs
+                matched_pairs += 1
+                if matched_pairs == 21:
+                    game_over = True
+                    win_message = "YOU WIN!"
+            else:
+                hide_timer = pygame.time.get_ticks() + 800
+        return
 restart_game()
 running = True
 while running:
-    restart_rect, hint_rect, shuffle_rect = draw_game()
+    clock.tick(FPS)
+    mouse_pos = pygame.mouse.get_pos()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            mouse_x, mouse_y = event.pos
-            if restart_rect.collidepoint(event.pos):
-                restart_game()
-                continue
-            if hint_rect.collidepoint(event.pos):
-                candidates = [
-                    (i, tile)
-                    for i, tile in enumerate(board)
-                    if tile["active"] and tile["symbol"] in tray
-                ]
-                if candidates:
-                    selected_hint = candidates[0][0]
-                    message = "Try the highlighted tile!"
-                else:
-                    message = "Find matching symbols!"
-                continue
-            if shuffle_rect.collidepoint(event.pos):
-                if not game_over:
-                    remaining = [
-                        tile["symbol"]
-                        for tile in board if tile["active"]
-                    ]
-                    random.shuffle(remaining)
-                    index = 0
-                    for tile in board:
-                        if tile["active"]:
-                            tile["symbol"] = remaining[index]
-                            index += 1
-                    selected_hint = None
-                    message = "Remaining tiles shuffled!"
-                continue
-            for index, tile in enumerate(board):
-                if not tile["active"]:
-                    continue
-                rect = pygame.Rect(
-                    tile["x"], tile["y"],
-                    TILE_SIZE, TILE_SIZE
-                )
-                if rect.collidepoint(event.pos):
-                    select_tile(tile)
-                    break
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                if current_page == "menu":
+                    if play_rect.collidepoint(mouse_pos):
+                        restart_game()
+                        current_page = "game"
+                    elif settings_rect.collidepoint(mouse_pos):
+                        current_page = "settings"
+                    elif exit_rect.collidepoint(mouse_pos):
+                        running = False
+                elif current_page == "settings":
+                    if music_button_rect.collidepoint(mouse_pos):
+                        toggle_music()
+                    elif back_settings_rect.collidepoint(mouse_pos):
+                        current_page = "menu"
+                    elif slider_rect.inflate(0, 25).collidepoint(mouse_pos):
+                        slider_dragging = True
+                        update_volume_from_mouse(mouse_pos[0])
+                elif current_page == "game":
+                    if back_game_rect.collidepoint(mouse_pos):
+                        current_page = "menu"
+                    elif restart_rect.collidepoint(mouse_pos):
+                        restart_game()
+                    else:
+                        handle_card_click(mouse_pos)
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                slider_dragging = False
+        elif event.type == pygame.MOUSEMOTION:
+            if current_page == "settings" and slider_dragging:
+                update_volume_from_mouse(mouse_pos[0])
+    if (
+        first_card is not None
+        and second_card is not None
+        and hide_timer
+        and pygame.time.get_ticks() >= hide_timer
+    ):
+        first_card["revealed"] = False
+        second_card["revealed"] = False
+        first_card = None
+        second_card = None
+        hide_timer = 0
+    if current_page == "menu":
+        draw_menu()
+    elif current_page == "settings":
+        draw_settings()
+    elif current_page == "game":
+        draw_game()
     pygame.display.flip()
-    clock.tick(60)
 pygame.quit()
-sys.exit()
