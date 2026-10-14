@@ -2,13 +2,9 @@ import os
 import random
 import pygame
 pygame.init()
-WIDTH = 900
-HEIGHT = 700
-FPS = 60
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+WIDTH, HEIGHT = screen.get_size()
 pygame.display.set_caption("Tile Club - Match Puzzle")
-clock = pygame.time.Clock()
-
 BACKGROUND_COLOR = (35, 24, 58)
 PURPLE = (100, 60, 160)
 DARK_PURPLE = (43, 27, 70)
