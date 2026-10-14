@@ -46,7 +46,7 @@ A casual memory-matching puzzle game built in Python using Pygame. Flip cards, t
 
 ### Gameplay Preview
 
-<video controls src="Assets/extra_file/Video.mp4" title="Title"></video>
+<![alt text](Assets/extra_file/Game_Play.gif)>
 
 ### *Menu 🎮*
 
